@@ -1,26 +1,46 @@
 {
-	"name": "stp-api-enterprise-js",
-	"main": "app.js",
-	"description": "APIs for STP Enterprise",
-	"version": "1.1.0",
-	"author": {
-		"name": "Van Truong Pham",
-		"email": "invncur@gmail.com"
-	},
-	"keywords": [
-		"erp","accounting","hrm","kế toán"
-	],
-	"dependencies": {
-		"express": "latest",
-		"body-parser": "latest",
-    "express-session":"latest",
-		"underscore":"latest",
-		"async":"latest",
-		"multer":"0.1.8",
-		"request":"latest",
-		"numeral":"latest",
-		"expo-server-sdk": "^3.0.1",
-		"moment":"latest",
-    "compression":"latest"
-	}
+  "name": "stp-api-enterprise-js",
+  "main": "app.js",
+  "description": "APIs for STP Enterprise",
+  "version": "1.1.0",
+  "author": "Van Truong Pham <invncur@gmail.com>",
+  "keywords": [
+    "erp",
+    "accounting",
+    "hrm",
+    "kế toán"
+  ],
+  "dependencies": {
+    "async": "latest",
+    "axios": "^1.7.2",
+    "body-parser": "latest",
+    "compression": "latest",
+    "cors": "^2.8.5",
+    "expo-server-sdk": "^3.0.1",
+    "express": "^4.19.2",
+    "express-session": "latest",
+    "moment": "latest",
+    "mssql": "^6.2.3",
+    "multer": "0.1.8",
+    "numeral": "latest",
+    "querystring": "^0.2.1",
+    "request": "latest",
+    "underscore": "latest",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pvtruong/stp-api-enterprise-js.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/pvtruong/stp-api-enterprise-js/issues"
+  },
+  "homepage": "https://github.com/pvtruong/stp-api-enterprise-js#readme"
 }

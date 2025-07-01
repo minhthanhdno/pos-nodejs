@@ -1,6 +1,10 @@
 var express = require('express');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+const cors = require('cors');
+
+
+
 
 var underscore = require('underscore');
 var https = require("https");
@@ -10,6 +14,10 @@ var async = require('async');
 var app = express();
 var compress = require('compression');
 app.use(compress());
+
+app.use(cors({
+    allowedHeaders: ['Content-Type', 'Authorization', 'username', 'password'] // Thêm 'username' và 'password' vào danh sách các trường header cho phép
+  }));
 //
 app.options('/*', function(req, res) {
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
@@ -40,7 +48,7 @@ var server = http.createServer(app);
 var route = require('./route');
 route(app);
 //start server
-var port = "1986";
+var port = "3001";
 server.listen(port, function() {
 	console.log('server start at ' + port + ' port');
 });
