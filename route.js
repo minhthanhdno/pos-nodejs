@@ -262,6 +262,28 @@ router.put("/:database/voucher/mpbl/:stt_rec/update", (req, res) => {
   });
 });
 
+//update dong dpbl
+router.put("/:database/voucher/dpbl/:stt_rec/update", (req, res) => {
+  const database = req.params.database;
+  const stt_rec = req.params.stt_rec;
+  const token = req.query.token || req.body.token || req.headers['access-token'] || "";
+  const updateFields = req.body;
+
+  require("request").put({
+    url: `http://localhost:1985/${database}/voucher/dpbl/${stt_rec}/update?token=${token}`,
+    form: updateFields
+  }, (error, response, body) => {
+    if (error) return res.status(500).send({ message: error.message });
+    if (body && body.includes("ERROR")) return res.status(400).send({ message: body });
+    try {
+      res.send(JSON.parse(body));
+    } catch (e) {
+      res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+    }
+  });
+});
+
+
 //gettable
 // Lấy danh sách bàn theo khu vực
 router.route('/:database/tables').get(function (req, res) {
