@@ -222,16 +222,27 @@ router.post("/:database/voucher/mpbl/:stt_rec", (req, res) => {
     },
     (error, response, body) => {
       if (error) return res.status(500).send({ message: error.message });
-
       if (body.includes("ERROR")) {
         return res.status(400).send({ message: body });
       }
-
       try {
         const data = JSON.parse(body);
         res.send(data);
+
+        // ==> LẤY CHÍNH XÁC ma_ban từ request hoặc response
+        let ma_ban = req.body.ma_ban;
+        if (!ma_ban && Array.isArray(data) && data[0] && data[0].ma_ban) {
+          ma_ban = data[0].ma_ban;
+        }
+        const status = 1; // đang sử dụng
+        const io = req.app.get('io');
+        if (io && ma_ban) {
+          io.emit('table_status_update', { ma_ban, status });
+        }
       } catch (e) {
-        res.status(500).send({ message: "Lỗi xử lý JSON trả về", raw: body });
+        if (!res.headersSent) {
+          res.status(500).send({ message: "Lỗi xử lý JSON trả về", raw: body });
+        }
       }
     }
   );
@@ -257,6 +268,9 @@ router.put("/:database/voucher/mpbl/:stt_rec/update", (req, res) => {
     if (body && body.includes("ERROR")) return res.status(400).send({ message: body });
     try {
       res.send(JSON.parse(body));
+
+
+	  
     } catch (e) {
       res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
     }
@@ -343,37 +357,35 @@ router.post("/:database/voucher/dpbl/:stt_rec", (req, res) => {
   const formData = new URLSearchParams(req.body).toString();
 
     request.post(
-      {
-        url: url,
-        body: formData,
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+    {
+      url: url,
+      body: formData,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" }
+    },
+    (error, response, body) => {
+      if (error) return res.status(500).send({ message: error.message });
+      if (body.includes("ERROR")) {
+        return res.status(400).send({ message: body });
+      }
+      try {
+        const data = JSON.parse(body);
+        res.send(data);
+
+        let ma_ban = req.body.ma_ban;
+        if (!ma_ban && Array.isArray(data) && data[0] && data[0].ma_ban) {
+          ma_ban = data[0].ma_ban;
         }
-      },
-      (error, response, body) => {
-        if (error) return res.status(500).send({ message: error.message });
-
-        if (body.includes("ERROR")) {
-          return res.status(400).send({ message: body });
+        const io = req.app.get('io');
+        if (io && ma_ban) {
+          io.emit('order_update', { stt_rec, ma_ban, data });
         }
-
-        try {
-          const data = JSON.parse(body);
-          res.send(data);
-
-          // ======= PHÁT SỰ KIỆN SOCKET.IO =======
-          const io = req.app.get('io');
-          if (io) {
-              // Gửi cho tất cả client sự kiện cập nhật order bàn
-              // Có thể truyền thêm stt_rec, ma_ban hoặc full order tùy nhu cầu
-              io.emit('order_update', { stt_rec, ma_ban: req.body.ma_ban, data });
-          }
-          // ======================================
-        } catch (e) {
+      } catch (e) {
+        if (!res.headersSent) {
           res.status(500).send({ message: "Lỗi xử lý JSON trả về", raw: body });
         }
       }
-    );
+    }
+  );
 });
 
 
@@ -476,6 +488,14 @@ router.route('/:database/voucher/dpbl/:stt_rec').post(function (req, res) {
   }
   const json = JSON.parse(body);
   return res.send(json);
+
+const io = req.app.get('io');
+if (io) {
+  io.emit('order_update', { stt_rec, ma_ban: req.body.ma_ban });
+}
+
+
+
 } catch (e) {
   return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message });
 }
@@ -497,23 +517,32 @@ router.put("/:database/voucher/mpbl/:stt_rec/pay", (req, res) => {
   request.put(
     {
       url: url,
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: "" // Không truyền body vì hàm WCF không cần input stream
+      headers: { "Content-Type": "application/json" },
+      body: ""
     },
     (error, response, body) => {
       if (error) return res.status(500).send({ message: error.message });
-
       if (body.includes("ERROR")) {
         return res.status(400).send({ message: body });
       }
-
       try {
         const data = JSON.parse(body);
         res.send(data);
+
+        // Lấy ma_ban chuẩn xác từ data trả về
+        let ma_ban = req.body.ma_ban;
+        if (!ma_ban && Array.isArray(data) && data[0] && data[0].ma_ban) {
+          ma_ban = data[0].ma_ban;
+        }
+        const io = req.app.get('io');
+        if (io && ma_ban) {
+          io.emit('order_paid', { stt_rec, ma_ban });
+          io.emit('order_update', { stt_rec, ma_ban });
+        }
       } catch (e) {
-        res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+        if (!res.headersSent) {
+          res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+        }
       }
     }
   );
@@ -533,7 +562,7 @@ router.delete("/:database/voucher/mpbl/:stt_rec", (req, res) => {
   }
   const url = `http://localhost:1985/${database}/voucher/mpbl/${stt_rec}?token=${token}`;
   // Gọi tới backend bằng DELETE (nếu VB.NET dùng WebInvoke với Method="DELETE")
-  require("request").delete(url, (error, response, body) => {
+ require("request").delete(url, (error, response, body) => {
     if (error) return res.status(500).send({ message: error.message });
     if (body && body.includes("ERROR")) {
       return res.status(400).send({ message: body });
@@ -541,8 +570,19 @@ router.delete("/:database/voucher/mpbl/:stt_rec", (req, res) => {
     try {
       const data = JSON.parse(body);
       res.send(data);
+
+      let ma_ban = req.body.ma_ban;
+      if (!ma_ban && Array.isArray(data) && data[0] && data[0].ma_ban) {
+        ma_ban = data[0].ma_ban;
+      }
+      const io = req.app.get('io');
+      if (io && ma_ban) {
+        io.emit('table_returned', { stt_rec, ma_ban });
+      }
     } catch (e) {
-      res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+      if (!res.headersSent) {
+        res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+      }
     }
   });
 });
@@ -565,26 +605,35 @@ router.post("/:database/voucher/mpbl/:stt_rec/switch-table", (req, res) => {
   const url = `http://localhost:1985/${database}/voucher/mpbl/${stt_rec}/switch-table?token=${token}&to_table=${to_table}`;
   console.log("🔁 Đổi bàn WCF:", url);
 
-  request.post(
+   request.post(
     {
       url: url,
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: "" // backend VB.NET không cần body cho API này
+      headers: { "Content-Type": "application/json" },
+      body: ""
     },
     (error, response, body) => {
       if (error) return res.status(500).send({ message: error.message });
-
       if (body.includes("ERROR")) {
         return res.status(400).send({ message: body });
       }
-
       try {
         const data = JSON.parse(body);
         res.send(data);
+
+        // Lấy bàn cũ và bàn mới chính xác
+        let to_table = req.body.to_table || req.query.to_table;
+        let from_table = req.body.from_table || req.query.from_table;
+        const io = req.app.get('io');
+        if (io && to_table) {
+          io.emit('order_update', { stt_rec, ma_ban: to_table });
+        }
+        if (io && from_table) {
+          io.emit('order_update', { stt_rec, ma_ban: from_table });
+        }
       } catch (e) {
-        res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+        if (!res.headersSent) {
+          res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+        }
       }
     }
   );
