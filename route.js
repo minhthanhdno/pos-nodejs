@@ -237,6 +237,7 @@ router.post("/:database/voucher/mpbl/:stt_rec", (req, res) => {
   );
 });
 
+
 //Xử lý update động nhiều trường trong MPLB
 router.put("/:database/voucher/mpbl/:stt_rec/update", (req, res) => {
   const database = req.params.database;
@@ -341,30 +342,42 @@ router.post("/:database/voucher/dpbl/:stt_rec", (req, res) => {
   // Forward body dạng application/x-www-form-urlencoded
   const formData = new URLSearchParams(req.body).toString();
 
-  request.post(
-    {
-      url: url,
-      body: formData,
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      }
-    },
-    (error, response, body) => {
-      if (error) return res.status(500).send({ message: error.message });
+    request.post(
+      {
+        url: url,
+        body: formData,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        }
+      },
+      (error, response, body) => {
+        if (error) return res.status(500).send({ message: error.message });
 
-      if (body.includes("ERROR")) {
-        return res.status(400).send({ message: body });
-      }
+        if (body.includes("ERROR")) {
+          return res.status(400).send({ message: body });
+        }
 
-      try {
-        const data = JSON.parse(body);
-        res.send(data);
-      } catch (e) {
-        res.status(500).send({ message: "Lỗi xử lý JSON trả về", raw: body });
+        try {
+          const data = JSON.parse(body);
+          res.send(data);
+
+          // ======= PHÁT SỰ KIỆN SOCKET.IO =======
+          const io = req.app.get('io');
+          if (io) {
+              // Gửi cho tất cả client sự kiện cập nhật order bàn
+              // Có thể truyền thêm stt_rec, ma_ban hoặc full order tùy nhu cầu
+              io.emit('order_update', { stt_rec, ma_ban: req.body.ma_ban, data });
+          }
+          // ======================================
+        } catch (e) {
+          res.status(500).send({ message: "Lỗi xử lý JSON trả về", raw: body });
+        }
       }
-    }
-  );
+    );
 });
+
+
+
 
 //xu ly trang thai table
 router.put('/:database/table/:ma_ban/status', function(req, res) {

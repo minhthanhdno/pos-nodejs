@@ -15,6 +15,11 @@ var app = express();
 var compress = require('compression');
 app.use(compress());
 
+
+
+
+
+
 app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization', 'username', 'password'] // Thêm 'username' và 'password' vào danh sách các trường header cho phép
   }));
@@ -44,6 +49,25 @@ app.use(bodyParser.urlencoded({
 app.use(bodyParser.json());
 //
 var server = http.createServer(app);
+
+
+
+// === THÊM socket.io ===
+const { Server } = require('socket.io');
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
+
+// Đặt biến io global để route.js truy cập
+app.set('io', io);
+
+
+
+
+
 //route
 var route = require('./route');
 route(app);
@@ -51,4 +75,15 @@ route(app);
 var port = "3001";
 server.listen(port, function() {
 	console.log('server start at ' + port + ' port');
+});
+
+
+
+
+// OPTIONAL: log connection socket
+io.on('connection', (socket) => {
+    console.log('Socket client connected:', socket.id);
+    socket.on('disconnect', () => {
+        console.log('Socket client disconnected:', socket.id);
+    });
 });
