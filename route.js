@@ -392,23 +392,41 @@ router.post("/:database/voucher/dpbl/:stt_rec", (req, res) => {
 
 
 //xu ly trang thai table
-router.put('/:database/table/:ma_ban/status', function(req, res) {
+router.put('/:database/table/:ma_ban/status', function(req, res) { 
   const database = req.params.database;
   const ma_ban = req.params.ma_ban;
   const token = req.query.token || req.headers['access-token'] || "";
-  let url = `${server}${database}/table/${ma_ban}/status?token=${token}`;
-  let status = req.body.status; // cần dùng body-parser.urlencoded ở app.js!
-  let bodyStr = `status=${status}`;
+  const status = req.body.status; // Yêu cầu dùng body-parser
+  if (typeof status === "undefined") {
+    return res.status(400).send({ message: "Thiếu trường status!" });
+  }
+
+  // Build URL gọi sang WCF API cập nhật status (hoặc xử lý trực tiếp DB ở NodeJS nếu muốn)
+  const url = `${server}${database}/table/${ma_ban}/status?token=${token}`;
+  const bodyStr = `status=${status}`;
+  
+  // Gửi request cập nhật status sang backend
   request.put({
     url: url,
     body: bodyStr,
     headers: { 'content-type': 'application/x-www-form-urlencoded' }
   }, function(error, response, body) {
     if (error) return res.status(400).send({ message: error.message || error });
+
     try {
-      return res.send(JSON.parse(body));
+      // Parse response từ backend
+      const result = JSON.parse(body);
+
+      // Phát socket realtime cho FE (nếu có)
+      const io = req.app.get('io');
+      if (io) {
+        io.emit('table_status_update', { ma_ban, status });
+      }
+
+      // Trả kết quả cho FE
+      return res.send(result);
     } catch (e) {
-      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message });
+      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
     }
   });
 });
@@ -583,6 +601,38 @@ router.delete("/:database/voucher/mpbl/:stt_rec", (req, res) => {
       if (!res.headersSent) {
         res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
       }
+    }
+  });
+});
+
+// GET thông tin phiếu mpbl theo stt_rec
+router.get('/:database/voucher/mpbl/:stt_rec', function(req, res) {
+  const database = req.params.database;
+  const stt_rec = req.params.stt_rec;
+  const token = req.query.token || req.headers['access-token'] || "";
+  const url = `${server}${database}/voucher/mpbl/${stt_rec}?token=${token}`;
+  request.get({ url }, function(error, response, body) {
+    if (error) return res.status(400).send({ message: error.message || error });
+    try {
+      return res.send(JSON.parse(body));
+    } catch (e) {
+      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
+    }
+  });
+});
+
+//Lay DMVT join DPBL
+router.get('/:database/voucher/dpbl/:stt_rec/detail', function(req, res) {
+  const database = req.params.database;
+  const stt_rec = req.params.stt_rec;
+  const token = req.query.token || req.headers['access-token'] || "";
+  const url = `${server}${database}/voucher/dpbl/${stt_rec}/detail?token=${token}`;
+  request.get({ url }, function(error, response, body) {
+    if (error) return res.status(400).send({ message: error.message || error });
+    try {
+      return res.send(JSON.parse(body));
+    } catch (e) {
+      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
     }
   });
 });
