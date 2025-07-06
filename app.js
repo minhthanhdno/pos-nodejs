@@ -68,13 +68,15 @@ app.set('io', io);
 
 
 
-//route
+// route
 var route = require('./route');
 route(app);
-//start server
-var port = "3001";
-server.listen(port, function() {
-	console.log('server start at ' + port + ' port');
+// start server
+var port = 3001; // kiểu số
+var host = '0.0.0.0';
+
+server.listen(port, host, function() {
+    console.log('server start at ' + host + ':' + port);
 });
 
 

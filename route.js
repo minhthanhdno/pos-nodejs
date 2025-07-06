@@ -30,31 +30,56 @@ module.exports = function (app) {
 	});
 	app.use('/api', router);
 	//get ent-token
-	router.route('/:database/token').get(function (req, res, next) {
-		const database = req.params.database;
-		let username = req.headers['username'] || req.query.username;
-		let password = req.headers['password'] || req.query.password;
-		let authorization = req.headers.authorization;
-		if (authorization) {
-			authorization = new Buffer(authorization.replace("Basic ", ""), 'base64').toString().split(":");
-			if (authorization.length > 1) {
-				username = authorization[0];
-				password = authorization[1];
-			}
-		}
-		if (!database || !username || !password) {
-			return res.status(400).send({ message: "Authorization is required" });
-		}
-		let url = server + database + "/gettoken/nodejs?username=" + username + "&password=" + password;
-		request(url, function (error, response, body) {
-			if (error) return res.status(400).send({ message: error.message || error });
-			if (body.indexOf("ERROR") >= 0) {
-				return res.status(400).send({ message: body });
-			}
-			body = eval("(" + body + ")");
-			return res.send(body);
-		});
-	});
+	// Thay thế toàn bộ route GET thành cả GET và POST (nếu cần vẫn giữ GET cũ để tương thích)
+router.route('/:database/token')
+  .all(async function (req, res, next) { // .all cho phép cả GET và POST
+    try {
+      const database = req.params.database;
+      // Ưu tiên body > header > query
+      let username =
+        (req.body && req.body.username) ||
+        req.headers['username'] ||
+        req.query.username;
+      let password =
+        (req.body && req.body.password) ||
+        req.headers['password'] ||
+        req.query.password;
+
+      // Xử lý Basic Auth nếu có
+      let authorization = req.headers.authorization;
+      if (authorization && authorization.startsWith("Basic ")) {
+        const decoded = Buffer.from(authorization.replace("Basic ", ""), 'base64').toString();
+        const [user, pass] = decoded.split(':');
+        if (user && pass) {
+          username = user;
+          password = pass;
+        }
+      }
+
+      if (!database || !username || !password) {
+        return res.status(400).send({ message: "Authorization is required" });
+      }
+
+      const url = server + database + "/gettoken/nodejs?username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password);
+      request(url, function (error, response, body) {
+        if (error) return res.status(400).send({ message: error.message || error });
+        if (body.indexOf("ERROR") >= 0) {
+          return res.status(400).send({ message: body });
+        }
+        // KHÔNG dùng eval!
+        let json;
+        try {
+          json = JSON.parse(body);
+        } catch (e) {
+          return res.status(400).send({ message: "Parse token error: " + e.message });
+        }
+        return res.send(json);
+      });
+    } catch (err) {
+      return res.status(500).send({ message: "Server error: " + err.message });
+    }
+  });
+
 	//logout
 	router.route('/:database/logout').get(function (req, res, next) {
 		const database = req.params.database;
@@ -199,7 +224,7 @@ module.exports = function (app) {
   });
 });
 
-// MPBL
+// CreateVoucherMPBL
 // Tạo phiếu bán hàng lẻ (mpbl)
 router.post("/:database/voucher/mpbl/:stt_rec", (req, res) => {
   const database = req.params.database;
@@ -277,26 +302,73 @@ router.put("/:database/voucher/mpbl/:stt_rec/update", (req, res) => {
   });
 });
 
-//update dong dpbl
+//update dong dpbl UpdateVoucherDPBL
 router.put("/:database/voucher/dpbl/:stt_rec/update", (req, res) => {
   const database = req.params.database;
   const stt_rec = req.params.stt_rec;
-  const token = req.query.token || req.body.token || req.headers['access-token'] || "";
-  const updateFields = req.body;
+  const token =
+    req.query.token ||
+    req.body.token ||
+    req.headers["access-token"] ||
+    "";
 
-  require("request").put({
-    url: `http://localhost:1985/${database}/voucher/dpbl/${stt_rec}/update?token=${token}`,
-    form: updateFields
-  }, (error, response, body) => {
-    if (error) return res.status(500).send({ message: error.message });
-    if (body && body.includes("ERROR")) return res.status(400).send({ message: body });
+  const updateFields = req.body; // hỗ trợ cả JSON lẫn urlencoded (express đã parse)
+  const headers = {};
+  let requestOptions = {};
+
+  // Nếu FE gửi JSON, thì gửi lên backend dạng application/json
+  if (
+    req.headers["content-type"] &&
+    req.headers["content-type"].includes("application/json")
+  ) {
+    headers["content-type"] = "application/json";
+    requestOptions = {
+      url: `http://localhost:1985/${database}/voucher/dpbl/${stt_rec}/update?token=${token}`,
+      body: JSON.stringify(updateFields),
+      headers,
+    };
+  } else {
+    // Nếu là form-urlencoded
+    headers["content-type"] = "application/x-www-form-urlencoded";
+    requestOptions = {
+      url: `http://localhost:1985/${database}/voucher/dpbl/${stt_rec}/update?token=${token}`,
+      form: updateFields,
+      headers,
+    };
+  }
+
+  require("request").put(requestOptions, (error, response, body) => {
+    if (error)
+      return res.status(500).send({ message: error.message || error });
+
+    // Trả về lỗi dễ debug nếu backend báo lỗi
+    if (body && body.includes("ERROR"))
+      return res.status(400).send({ message: body });
+
+    let result = {};
     try {
-      res.send(JSON.parse(body));
+      result = JSON.parse(body);
     } catch (e) {
-      res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
+      return res.status(500).send({ message: "Lỗi phân tích JSON", raw: body });
     }
+
+    // --- PHÁT SOCKET realtime nếu cần ---
+    // Ví dụ: cập nhật món hoặc trạng thái tạm tính
+    // Chỉ phát khi thành công, có trường hợp FE cần cập nhật bảng/phiếu ngay
+    const io = req.app.get("io");
+    if (io && result.status === "OK") {
+      // Phát cho tất cả client đang mở app biết có cập nhật phiếu
+      io.emit("voucher_dpbl_updated", {
+        stt_rec,
+        database,
+        updateFields,
+      });
+    }
+
+    res.send(result);
   });
 });
+
 
 
 //gettable
@@ -337,6 +409,22 @@ router.route('/:database/tables').get(function (req, res) {
       return res.send(json);
     } catch (e) {
       return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message });
+    }
+  });
+});
+//
+//
+//Lấy danh sách khu vực res_dmkv
+router.get('/:database/areas', function(req, res) {
+  const database = req.params.database;
+  const token = req.query.token || req.headers['access-token'] || "";
+  const url = `${server}${database}/areas?token=${token}`;
+  require('request').get({ url }, function(error, response, body) {
+    if (error) return res.status(400).send({ message: error.message || error });
+    try {
+      return res.send(JSON.parse(body));
+    } catch (e) {
+      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
     }
   });
 });
