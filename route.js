@@ -1064,6 +1064,167 @@ router.post("/:database/voucher/mpbl/:stt_rec/switch-table", (req, res) => {
   }
 });
 
+
+//Lấy báo cáo từ store procedure - Bao cao doanh thu ban le theo ngay rsale_dtbanletn
+// Lấy báo cáo động từ WCF
+// router.route('/:database/report/:id/:stt/:typeData').get(function (req, res) {
+//   const database = req.params.database;
+//   const id = req.params.id;
+//   const stt = req.params.stt;
+//   const typeData = req.params.typeData;
+//   const token = req.headers['access-token'] || req.query.token || "";
+
+//   if (!token) {
+//     return res.status(401).send({ message: "Thiếu token" });
+//   }
+
+//   // Build WCF URL
+//   let url = `${server}${database}/report/${id}/${stt}/${typeData}?token=${encodeURIComponent(token)}`;
+//   for (let key in req.query) {
+//     if (key.toLowerCase() !== "token" && typeof req.query[key] !== "undefined" && req.query[key] !== null) {
+//       let value = req.query[key];
+//       if (value === true || value === "true") value = "1";
+//       if (value === false || value === "false") value = "0";
+//       url += `&${key}=${encodeURIComponent(value)}`;
+//     }
+//   }
+
+//   request(url, function (error, response, body) {
+//     if (error) return res.status(400).send({ message: error.message || error });
+
+//     if (typeof body === "string" && body.includes("ERROR")) {
+//       return res.status(400).send({ message: body });
+//     }
+
+//     if (typeData.toUpperCase() === "JSON") {
+//       try {
+//         const json = JSON.parse(body);
+//         return res.send(json);
+//       } catch (e) {
+//         return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
+//       }
+//     } else {
+//       res.setHeader("Content-Type", "application/xml; charset=utf-8");
+//       return res.send(body);
+//     }
+//   });
+// });
+
+//Báo cáo XML// Lấy báo cáo động từ WCF (trả JSON)
+router.route('/:database/report/:id/:stt').get(function (req, res) {
+  const database = req.params.database;
+  const id = req.params.id;
+  const stt = req.params.stt;
+  const token = req.headers['access-token'] || req.query.token || "";
+	console.log('Request Query1 ********:', token);
+  if (!token) {
+    return res.status(401).send({ message: "Thiếu token" });
+  }
+
+  // Xây dựng URL gọi đến WCF cho báo cáo
+  let url = `${server}${database}/report/${id}/${stt}?token=${encodeURIComponent(token)}`;
+	console.log('Request Query1 ********:', url);
+
+  // Thêm các tham số truy vấn khác nếu có (ngoại trừ token)
+  for (let q in req.query) {
+    if (q !== "token") {
+      let v_q = req.query[q];
+      if (v_q === true || v_q === "true") v_q = "1";
+      if (v_q === false || v_q === "false") v_q = "0";
+      url += `&${q}=${encodeURIComponent(v_q)}`;
+    }
+  }
+
+  // Gửi request đến WCF
+  request(url, function (error, response, body) {
+    if (error) return res.status(400).send({ message: error.message || error });
+
+    if (typeof body === "string" && body.includes("ERROR")) {
+      return res.status(400).send({ message: body });
+    }
+
+    // Trường hợp WCF trả về chuỗi JSON
+    try {
+      let json = body;
+      if (typeof body === "string") {
+        json = JSON.parse(body);
+      }
+      return res.send(json);
+    } catch (e) {
+      return res.status(500).send({ message: "Lỗi parse JSON từ WCF", detail: e.message, raw: body });
+    }
+  });
+});
+
+//Tạm ẩn ent report
+	// router.route('/:database/report/:id_rpt/:stt/info').get(function (req, res, next) {
+	// 	const database = req.params.database;
+	// 	const id_rpt = req.params.id_rpt;
+	// 	const stt = req.params.stt;
+	// 	const token = req.headers['access-token'] || req.query.access_token;
+	// 	let url = server + database + "/report/" + id_rpt + "/" + stt + "/info?token=" + token;
+	// 	request(url, function (error, response, body) {
+	// 		if (error) {
+	// 			console.error(error);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: error.message || error });
+	// 		}
+	// 		if (body.indexOf("ERROR") >= 0) {
+	// 			console.error(body);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: body });
+	// 		}
+	// 		try {
+	// 			body = JSON.parse(body);
+	// 		} catch (e) {
+	// 			console.error(body);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: e.message || e });
+	// 		}
+	// 		return res.send(body);
+	// 	});
+	// });
+	// router.route('/:database/report/:id_rpt/:stt').get(function (req, res, next) {
+	// 	const database = req.params.database;
+	// 	const id_rpt = req.params.id_rpt;
+	// 	const stt = req.params.stt;
+	// 	const token = req.headers['access-token'] || req.query.access_token;
+	// 	let url = server + database + "/report/" + id_rpt + "/" + stt + "?token=" + token;
+	// 	let v_q;
+	// 	for (let q in req.query) {
+	// 		if (q !== "access_token") {
+	// 			v_q = req.query[q];
+	// 			if (v_q == true || v_q == "true") {
+	// 				v_q = "1"
+	// 			}
+	// 			if (v_q == false || v_q == "false") {
+	// 				v_q == "0"
+	// 			}
+	// 			url = url + "&" + q + "=" + encodeURI(v_q);
+	// 		}
+	// 	}
+	// 	request(url, function (error, response, body) {
+	// 		if (error) {
+	// 			console.error(error);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: error.message || error });
+	// 		}
+	// 		if (body.indexOf("ERROR") >= 0) {
+	// 			console.error(body);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: body });
+	// 		}
+	// 		try {
+	// 			body = JSON.parse(body);
+	// 		} catch (e) {
+	// 			console.error(body);
+	// 			console.error(url);
+	// 			return res.status(400).send({ message: e.message || e });
+	// 		}
+	// 		res.send(body);
+	// 	});
+	// });
+
 	  //////////////////Tạo voucher//////
 	  router.post('/create_invoice', async (req, res) => {
 		const { ma_ct, ma_ban, status, access_token } = req.body;
@@ -1089,74 +1250,7 @@ router.post("/:database/voucher/mpbl/:stt_rec/switch-table", (req, res) => {
 	  //////////////////////
 
 ///////////////////////////////////////////////
-	//ent report
-	router.route('/:database/report/:id_rpt/:stt/info').get(function (req, res, next) {
-		const database = req.params.database;
-		const id_rpt = req.params.id_rpt;
-		const stt = req.params.stt;
-		const token = req.headers['access-token'] || req.query.access_token;
-		let url = server + database + "/report/" + id_rpt + "/" + stt + "/info?token=" + token;
-		request(url, function (error, response, body) {
-			if (error) {
-				console.error(error);
-				console.error(url);
-				return res.status(400).send({ message: error.message || error });
-			}
-			if (body.indexOf("ERROR") >= 0) {
-				console.error(body);
-				console.error(url);
-				return res.status(400).send({ message: body });
-			}
-			try {
-				body = JSON.parse(body);
-			} catch (e) {
-				console.error(body);
-				console.error(url);
-				return res.status(400).send({ message: e.message || e });
-			}
-			return res.send(body);
-		});
-	});
-	router.route('/:database/report/:id_rpt/:stt').get(function (req, res, next) {
-		const database = req.params.database;
-		const id_rpt = req.params.id_rpt;
-		const stt = req.params.stt;
-		const token = req.headers['access-token'] || req.query.access_token;
-		let url = server + database + "/report/" + id_rpt + "/" + stt + "?token=" + token;
-		let v_q;
-		for (let q in req.query) {
-			if (q !== "access_token") {
-				v_q = req.query[q];
-				if (v_q == true || v_q == "true") {
-					v_q = "1"
-				}
-				if (v_q == false || v_q == "false") {
-					v_q == "0"
-				}
-				url = url + "&" + q + "=" + encodeURI(v_q);
-			}
-		}
-		request(url, function (error, response, body) {
-			if (error) {
-				console.error(error);
-				console.error(url);
-				return res.status(400).send({ message: error.message || error });
-			}
-			if (body.indexOf("ERROR") >= 0) {
-				console.error(body);
-				console.error(url);
-				return res.status(400).send({ message: body });
-			}
-			try {
-				body = JSON.parse(body);
-			} catch (e) {
-				console.error(body);
-				console.error(url);
-				return res.status(400).send({ message: e.message || e });
-			}
-			res.send(body);
-		});
-	});
+	
 
 /////////////////////////////////store proc////////////////
 

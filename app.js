@@ -21,8 +21,19 @@ app.use(compress());
 
 
 app.use(cors({
-    allowedHeaders: ['Content-Type', 'Authorization', 'username', 'password'] // Thêm 'username' và 'password' vào danh sách các trường header cho phép
-  }));
+  origin: true, // cho phép mọi origin (hoặc chỉ định origin cụ thể)
+  credentials: true,
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'username',
+    'password',
+    'token',
+    'access-token',
+    'X-Requested-With'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'HEAD', 'DELETE', 'OPTIONS']
+}));
 //
 app.options('/*', function(req, res) {
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
